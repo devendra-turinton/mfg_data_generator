@@ -69,6 +69,11 @@ class ISA95Level2DataGenerator:
         """Initialize reference data used across tables"""
         # Try to load Level 1 data for references if available
         self._load_level1_data()
+
+        self.equipment_ids = []
+        self.area_ids = []
+        self.batch_ids = []
+        self.recipe_ids = []
         
         # Create equipment IDs if not loaded from Level 1
         if not self.equipment_ids:
@@ -85,12 +90,14 @@ class ISA95Level2DataGenerator:
         
         # Create work order IDs
         self.work_order_ids = [f"WO-{uuid.uuid4().hex[:8].upper()}" for _ in range(20)]
-        
+
         # Create product IDs
         self.product_ids = [f"PROD-{uuid.uuid4().hex[:8].upper()}" for _ in range(15)]
+
         
         # Create operator IDs
         self.operator_ids = [f"OP-{uuid.uuid4().hex[:8].upper()}" for _ in range(15)]
+
         
         # Create personnel IDs (for authors, approvers, managers)
         self.personnel_ids = [f"PERS-{uuid.uuid4().hex[:8].upper()}" for _ in range(20)]
@@ -160,6 +167,10 @@ class ISA95Level2DataGenerator:
         print(f"\n3. Generating {num_equipment} Equipment...")
         self.generate_equipment(num_equipment)
         
+        # IMPORTANT: Update equipment_ids after generation
+        if self.equipment_df is not None:
+            self.equipment_ids = self.equipment_df['equipment_id'].tolist()
+
         print(f"\n4. Generating Equipment States...")
         self.generate_equipment_states(start_time, end_time)
         
@@ -464,6 +475,14 @@ class ISA95Level2DataGenerator:
         Returns:
         - DataFrame containing the generated equipment data
         """
+
+        if self.process_areas_df is not None and len(self.process_areas_df) > 0:
+            self.area_ids = self.process_areas_df['area_id'].tolist()
+        
+        if not self.area_ids or len(self.area_ids) == 0:
+            print("Error: No process areas available. Generate process areas first.")
+            return None
+        
         # Define possible values for categorical fields
         equipment_types = [
             "Reactor", "Mixer", "Pump", "Compressor", "Heat Exchanger", "Distillation Column",
@@ -584,10 +603,11 @@ class ISA95Level2DataGenerator:
             data["equipment_name"].append(eq_name)
             
             # Assign to a process area
-            if self.area_ids:
+            if self.area_ids and len(self.area_ids) > 0:
                 data["area_id"].append(random.choice(self.area_ids))
             else:
-                data["area_id"].append("")
+                print("Warning: No area IDs available. This will cause foreign key violations.")
+                data["area_id"].append("")  # This will fail FK constraint
             
             # Select manufacturer
             manufacturer = random.choice(manufacturers)
@@ -1918,7 +1938,7 @@ class ISA95Level2DataGenerator:
         if self.recipes_df is None or len(self.recipes_df) == 0:
             print("Error: No recipes data available. Generate recipes first.")
             return None
-                
+        
         if self.equipment_df is None or len(self.equipment_df) == 0:
             print("Error: No equipment data available. Generate equipment first.")
             return None
@@ -2096,7 +2116,11 @@ class ISA95Level2DataGenerator:
             if equipment_requirement and equipment_requirement in self.equipment_df['equipment_type'].values:
                 # Use equipment of the required type
                 matching_equipment = self.equipment_df[self.equipment_df['equipment_type'] == equipment_requirement]
-                data["equipment_id"].append(matching_equipment.sample(1).iloc[0]['equipment_id'])
+                if len(matching_equipment) > 0:
+                    data["equipment_id"].append(matching_equipment.sample(1).iloc[0]['equipment_id'])
+                else:
+                    # No matching equipment type, use any available
+                    data["equipment_id"].append(self.equipment_df.sample(1).iloc[0]['equipment_id'])
             else:
                 # Use any available equipment
                 data["equipment_id"].append(self.equipment_df.sample(1).iloc[0]['equipment_id'])

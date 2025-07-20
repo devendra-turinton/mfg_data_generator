@@ -200,6 +200,9 @@ class ISA95Level3DataGenerator:
         print(f"\n2. Generating {num_material_lots} Material Lots...")
         self.generate_material_lots(num_material_lots, start_time, end_time)
         
+        if self.material_lots_df is not None:
+            self.lot_ids = self.material_lots_df['lot_id'].tolist()
+
         print(f"\n3. Generating {num_material_transactions} Material Transactions...")
         self.generate_material_transactions(num_material_transactions, start_time, end_time)
         
@@ -725,6 +728,7 @@ class ISA95Level3DataGenerator:
             else:
                 data["parent_lot_id"].append("")
         
+       
         # Create DataFrame
         df = pd.DataFrame(data)
         
@@ -756,6 +760,11 @@ class ISA95Level3DataGenerator:
             print("Error: No material lots data available. Generate material lots first.")
             return None
         
+        all_lots = self.material_lots_df['lot_id'].tolist()
+        active_lots = self.material_lots_df[self.material_lots_df['status'].isin(['Active', 'Reserved', 'In Process'])]['lot_id'].tolist()
+        consumed_lots = self.material_lots_df[self.material_lots_df['status'] == 'Consumed']['lot_id'].tolist()
+        
+
         # Set default time range if not provided
         if start_time is None:
             start_time = datetime.now() - timedelta(days=180)
@@ -1141,7 +1150,7 @@ class ISA95Level3DataGenerator:
                 variance_pct = (variance / planned_consumption) * 100
             else:
                 variance_pct = 0
-            data["variance_pct"].append(round(variance_pct, 6))
+            data["variance_pct"].append(round(variance_pct, 2))
         
         # Create DataFrame
         df = pd.DataFrame(data)
@@ -1173,6 +1182,7 @@ class ISA95Level3DataGenerator:
             print("Error: No material lots data available. Generate material lots first.")
             return None
         
+
         # Set default time range if not provided
         if start_time is None:
             start_time = datetime.now() - timedelta(days=180)
